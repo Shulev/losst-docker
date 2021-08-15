@@ -1,0 +1,222 @@
+version: '3.8'
+
+
+networks:
+  monitor-net:
+    driver: bridge
+
+
+services:
+
+  ###############################################################
+  #                     Prometheus                              #
+  ###############################################################
+    prometheus:
+        image: prom/prometheus:latest
+        container_name: prometheus
+        volumes:
+            - /opt/prometheus/conf:/etc/prometheus
+            - /opt/prometheus/data:/prometheus
+        command:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--web.console.libraries=/etc/prometheus/console_libraries'
+            - '--web.console.templates=/etc/prometheus/consoles'
+#            - '--storage.tsdb.retention.time=180d'
+#            - '--storage.tsdb.retention.size=180d'
+            - '--web.enable-lifecycle'
+        restart: unless-stopped
+        networks:
+            - monitor-net
+        labels:
+             org.label-schema.group: "monitoring"
+
+  ###############################################################
+  #                     Alertmanager                            #
+  ###############################################################
+    alertmanager:
+        image: prom/alertmanager:latest
+        container_name: alertmanager
+        volumes:
+            - /opt/prometheus/alertmanager/config/:/etc/alertmanager
+        command:
+            - --config.file=/etc/alertmanager/config.yml
+            - --storage.path=/alertmanager
+        restart: unless-stopped
+        gjk
+        networks:
+
+            - monitor-net
+        labels:
+            org.label-schema.group: "monitoring"
+
+  ###############################################################
+  #                     Nodeexporter                            #
+  ###############################################################
+    nodeexporter:
+        image: prom/node-exporter:latest
+        container_name: nodeexporter
+        volumes:
+            - /proc:/host/proc:ro
+            - /sys:/host/sys:ro
+            - /:/rootfs:ro
+        command:
+            - '--path.procfs=/host/proc'
+            - '--path.rootfs=/rootfs'
+            - '--path.sysfs=/host/sys'
+            - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+        restart: unless-stopped
+        networks:
+            - monitor-net
+        labels:
+           org.label-schema.group: "monitoring"
+
+  ###############################################################
+  #            Agent to collect runtime metrics                 #
+  ###############################################################
+    cadvisor:
+        image: gcr.io/google-containers/cadvisor:latest
+        container_name: cadvisor
+        volumes:
+            - /:/rootfs:ro
+            - /var/run:/var/run:rw
+            - /sys:/sys:ro
+            - /var/lib/bladesystem:/var/lib/bladesystem:ro
+        restart: unless-stopped
+        networks:
+            - monitor-net
+        labels:
+          org.label-schema.group: "monitoring"
+
+  ###############################################################
+  #                      Grafana                                #
+  ###############################################################
+    grafana:
+        image: grafana/grafana:latest
+        container_name: grafana
+        depends_on:
+            - prometheus
+        volumes:
+            - ./grafana:/var/lib/grafana
+            - ./grafana/provisioning/:/etc/grafana/provisioning/
+            - ./grafana/datasources:/etc/grafana/datasources
+            - ./grafana/dashboards:/etc/grafana/dashboards
+        environment:
+            - GF_SECURITY_ADMIN_USER=${ADMIN_USER}
+            - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+            - GF_USERS_ALLOW_SIGN_UP=false
+        networks:
+            - monitor-net
+        restart: unless-stopped
+        labels:
+            org.label-schema.group: "monitoring"
+
+  ###############################################################
+  #                      Pushgateway                            #
+  ###############################################################
+    pushgateway:
+        image: prom/pushgateway:latest
+        container_name: pushgateway
+        restart: unless-stopped
+        networks:
+            - monitor-net
+        labels:
+            org.label-schema.group: "monitoring"
+
+
+  ###############################################################
+  #                      Alerta-Web                             #
+  ###############################################################
+
+    alerta:
+        image: alerta/alerta-web:latest
+        container_name: alerta-web
+        depends_on:
+            - postgres
+            - alertmanager
+        environment:
+#            - DEBUG=1
+            - DATABASE_URL=postgres://$POSTGRES_USERNAME:$POSTGRES_PASSWORD@{IP}:5432/monitoring
+            - ADMIN_USERS=admin@alerta.io,devops@alerta.io
+            - ADMIN_PASSWORD=$ALERT_PASSWORD # default is "alerta"
+            - PLUGINS=remote_ip,reject,heartbeat,blackout,prometheus
+            - ALERTMANAGER_API_URL=http://{IP}:9093
+#            - AUTH_REQUIRED=True
+#            - ADMIN_KEY=demo-key # assigned to first user in ADMIN_USERS
+#            - ADMIN_KEY_MAXAGE=500
+        restart: unless-stopped
+        networks:
+            - monitor-net
+#        ports:
+#            - 9080:8080
+        labels:
+            org.label-schema.group: "monitoring"
+
+
+  ###############################################################
+  #                      PostgreSQL                             #
+  ###############################################################
+
+    postgres:
+        image: postgres:latest
+        container_name: postgres
+        environment:
+            POSTGRES_DB: monitoring
+            POSTGRES_USER: $POSTGRES_USERNAME
+            POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+        volumes:
+            - ./alerta-web/postgres:/var/lib/postgresql/data
+        restart: unless-stopped
+        ports:
+            - 5432:5432
+        labels:
+            org.label-schema.group: "monitoring"
+
+
+  ###############################################################
+  #                      blackbox_exporter                      #
+  ###############################################################
+
+    blackbox_exporter:
+        image: prom/blackbox-exporter:latest
+        container_name: blackboxexporter
+        volumes:
+            - /opt/prometheus/exporter/blackbox_exporter/config.yml:/etc/blackboxexporter/config.yml
+        ports:
+            - 9115:9115
+        command:
+            - '--config.file=/etc/blackboxexporter/config.yml'
+        restart: unless-stopped
+
+  ###############################################################
+  #                      Caddy                                  #
+  ###############################################################
+    caddy:
+        image: caddy:latest
+        container_name: caddy
+        ports:
+            - "9100:9100"
+            - "3000:3000"
+            - "9090:9090"
+            - "9093:9093"
+            - "9091:9091"
+            - "8080:8080"
+            - "9080:9080"
+        volumes:
+            - ./caddy:/etc/caddy
+            - ./caddy/.caddy:/root/.caddy:rw
+        environment:
+            - ADMIN_USER=${ADMIN_USER}
+            - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+            - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH:-asasfasf}
+        restart: unless-stopped
+        networks:
+            - monitor-net
+        labels:
+           org.label-schema.group: "monitoring"
+#        logging:
+#            driver: "json-file"
+#            options:
+#            max-size: "10m"
+
+

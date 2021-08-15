@@ -1,0 +1,5 @@
+---
+#- targets:
+#    - http://{IP}:8000/examples/data.json
+#  labels:
+#    job: json_exporter

@@ -1,0 +1,151 @@
+version: '3.8'
+
+networks:
+  monitor-net:
+    driver: bridge
+
+services:
+  ###############################################################
+  #                     Nginx                                  #
+  ###############################################################
+    nginx:
+        image: nginx:latest
+        container_name: nginx
+        volumes:
+            - "/opt/nginx/nginx-conf/nginx.conf:/etc/nginx/nginx.conf:ro"
+            - "/opt/nginx/nginx-conf/gitlab-http.conf:/etc/nginx/conf.d/gitlab-http.conf:ro"
+            - "/opt/nginx/nginx-logs:/var/log/nginx"
+        ports:
+            - "8080:80"
+        restart: unless-stopped
+        depends_on:
+            - gitlab_app
+        links:
+            - gitlab_app
+        networks:
+          - monitor-net
+
+  ###############################################################
+  #                     GitLab                                  #
+  ###############################################################
+    gitlab_app:
+        image: gitlab/gitlab-ee:latest
+        container_name: gitlab_app
+        hostname: 'git.example.com'
+        environment:
+            GITLAB_OMNIBUS_CONFIG: |
+                external_url 'https://gitlab.example.com'
+        volumes:
+            - '/opt/gitlab/config:/etc/gitlab'
+            - '/opt/gitlab/logs:/var/log/gitlab'
+            - '/opt/gitlab/data:/var/opt/gitlab'
+        restart: unless-stopped
+#        ports:
+#            - '8022:22'
+#            - '80:80'
+#            - '443:443'
+        networks:
+            - monitor-net
+        labels:
+             org.label-schema.group: "gitlab"
+
+
+    runner:
+    image: gitlab/gitlab-runner:latest
+    restart: unless-stopped
+    container_name: gitlab_runner
+    environment:
+      - CI_SERVER_URL=https://gitlab.example.com
+    volumes:
+      - ./volumes/runner:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+
+  ###############################################################
+  #                     PostgreSQL                              #
+  ###############################################################
+#    postgresql:
+#      restart: unless-stopped
+#      image: postgres:11-buster
+#      container_name: postgresql-11-buster
+#      environment:
+#        POSTGRES_USER: postgres
+#        POSTGRES_PASSWORD: postgres
+#        PGDATA: /var/lib/postgresql/data/pgdata
+#      volumes:
+#        - /opt/postgres11/postgres-data:/var/lib/postgresql/data
+#      ports:
+#        - '5432:5432'
+#      networks:
+#        - monitor-net
+#
+#  ###############################################################
+#  #                     Jira                                   #
+#  ###############################################################
+#    jira:
+#      restart: unless-stopped
+#      image: atlassian/jira-software:latest
+#      container_name: jira
+#      ports:
+#        - '8090:8080'
+#      volumes:
+#        - "/opt/jira2/:/var/atlassian/application-data/jira"
+#      networks:
+#        - monitor-net
+#
+#  ###############################################################
+#  #                     Confluence                              #
+#  ###############################################################
+#    confluence:
+#      restart: unless-stopped
+#      image: atlassian/confluence:latest
+#      container_name: confluence
+#      ports:
+#        - '8091:8090'
+#        - '8092:8091'
+#      volumes:
+#        - "/opt/confluence/:/var/atlassian/application-data/confluence"
+#      networks:
+#        - monitor-net
+#  ###############################################################
+#  #                     Redis                                   #
+#  ###############################################################
+#    redis:
+#      restart: unless-stopped
+#      image: redis:latest
+#      container_name: redis
+#      volumes:
+#        - "/opt/redis/redis-daa:/data"
+#      ports:
+#        - 6379:6379
+#      networks:
+#        - monitor-net
+#
+#  ###############################################################
+#  #                     Kanban                                  #
+#  ###############################################################
+#    kanban:
+#      restart: unless-stopped
+#      image: leanlabs/kanban:latest
+#      container_name: kanban
+#      ports:
+#        - '8095:80'
+#      environment:
+#        # URL on which Leanlabs Kanban will be reachable
+#        - KANBAN_SERVER_HOSTNAME=http://10.210.10.21:8095/
+#        # This string is used to generate user auth tokens
+#        - KANBAN_SECURITY_SECRET=qwerty
+#        # Your GitLab host URL
+#        - KANBAN_GITLAB_URL=https://10.210.10.21
+#        # Your GitLab OAuth client ID
+#        - KANBAN_GITLAB_CLIENT=914f59171eba3b25816ddbb65875eb2698b2b763d90f5c0915db16139917fd7e
+#        # Your GitLab OAuth client secret key
+#        - KANBAN_GITLAB_SECRET=14a387cc0aa45829f7e157daf50e4a04b9a1a63b8baa38948340c65c6085eab8
+#        # Wheter to enable sign up with user API token
+#        - KANBAN_ENABLE_SIGNUP=true
+#        # Redis server address - IP:PORT
+#        - KANBAN_REDIS_ADDR=redis:6379
+#      links:
+#        - redis:redis
+#      command: ./kanban server
+#      networks:
+#        - monitor-net

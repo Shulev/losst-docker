@@ -1,0 +1,24 @@
+version: '3.8'
+
+networks:
+  monitor-net:
+    driver: bridge
+
+services:
+    snmp-exporter:
+        image: prom/busybox:latest
+        container_name: snmp-exporter
+        volumes:
+#            - .build/snmp_exporter:/bin/snmp_exporter
+            - ./conf/snmp.yml:/etc/snmp_exporter/snmp.yml
+        command:
+            - "--config.file=/etc/snmp_exporter/snmp.yml"
+        restart: unless-stopped
+        networks:
+            - monitor-net
+        ports:
+          - "9116:9116"
+        entrypoint:
+          [ "/bin/snmp_exporter" ]
+        labels:
+             org.label-schema.group: "monitoring"

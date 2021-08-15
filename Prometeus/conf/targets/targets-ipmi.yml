@@ -1,0 +1,5 @@
+---
+- targets:
+    - {IP}
+  labels:
+    job: ipmi_exporter

@@ -1,0 +1,23 @@
+### Element Text
+{{ define "element.bot.text" }} {{ .CommonAnnotations.description }} {{ end }}
+
+### Element Summary
+{{ define "SLACK_TITLE_SUMMARY" -}}
+    {{- if .CommonAnnotations.summary -}}
+        {{- .CommonAnnotations.summary -}}
+    {{- else -}}
+        {{- with index .Alerts 0 -}}
+            {{- .Annotations.summary -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}
+
+
+### Element Title
+{{ define "SLACK_MSG_TITLE" }}
+    {{ if eq .Status "resolved" }}
+        {{- .Status | toUpper }} : {{ template "SLACK_TITLE_SUMMARY" . }}
+    {{ else if eq .Status "firing" }}
+        {{ .CommonLabels.severity | toUpper }} : {{ template "SLACK_TITLE_SUMMARY" . }}
+    {{ end }}
+{{ end }}

@@ -1,0 +1,197 @@
+global:
+  scrape_interval:     35s
+  evaluation_interval: 35s
+
+scrape_configs:
+  ###############################################################
+  #                      Prometheus                             #
+  ###############################################################
+
+   - job_name: 'prometheus'
+     honor_labels: true
+     static_configs:
+      - targets: ['{IP}:9090']
+
+  ###############################################################
+  #                      Pushgateway                            #
+  ###############################################################
+
+   - job_name: 'prometheus-pushgateway'
+     honor_labels: true
+     static_configs:
+      - targets: ['{IP}:9091']
+
+  ###############################################################
+  #                      Cadvisor                               #
+  ###############################################################
+
+   - job_name: 'cadvisor'
+     file_sd_configs:
+      - files:
+        - ./targets/targets-cadvisor.yml
+
+  ###############################################################
+  #                      Node-exporter                          #
+  ###############################################################
+
+   - job_name: 'node-exporter'
+     file_sd_configs:
+      - files:
+        - ./targets/targets-node-exporter.yml
+
+  ###############################################################
+  #                    JSON_exporter                            #
+  ###############################################################
+
+## gather the metrics from third party json sources, via the json exporter
+   - job_name: 'json-exporter'
+     metrics_path: /probe
+     file_sd_configs:
+       - files:
+         - ./targets/targets-json.yml
+     relabel_configs:
+       - source_labels: [__address__]
+         target_label: __param_target
+       - source_labels: [__param_target]
+         target_label: instance
+       - target_label: __address__
+         replacement: {IP}:7979 ## Location of the json exporter's real <hostname>:<port>
+
+  ###############################################################
+  #                    SNMP_exporter                            #
+  ###############################################################
+
+   - job_name: 'snmp-exporter'
+     static_configs:
+     file_sd_configs:
+       - files:
+         - ./targets/targets-snmp.yml
+     metrics_path: /snmp
+     params:
+       module: [ if_mib ]
+     relabel_configs:
+       - source_labels: [ __address__ ]
+         target_label: __param_target
+       - source_labels: [ __param_target ]
+         target_label: instance
+       - target_label: __address__
+         replacement: {IP}:9116
+
+  ###############################################################
+  #                    IPMI_exporter                            #
+  ###############################################################
+
+   - job_name: ipmi
+     scrape_interval: 1m
+     scrape_timeout: 30s
+     metrics_path: /ipmi
+     scheme: http
+     file_sd_configs:
+       - files:
+           - ./targets/targets-ipmi.yml
+         refresh_interval: 5m
+     relabel_configs:
+       - source_labels: [ __address__ ]
+         separator: ;
+         regex: (.*)
+         target_label: __param_target
+         replacement: ${1}
+         action: replace
+       - source_labels: [ __param_target ]
+         separator: ;
+         regex: (.*)
+         target_label: instance
+         replacement: ${1}
+         action: replace
+       - separator: ;
+         regex: .*
+         target_label: __address__
+         replacement: {IP}:9290
+         action: replace
+
+ ###############################################################
+  #                    IPMI_exporter                            #
+  ###############################################################
+
+   - job_name: ipmi-100
+     scrape_interval: 1m
+     scrape_timeout: 30s
+     metrics_path: /ipmi
+     scheme: http
+     file_sd_configs:
+       - files:
+           - ./targets/targets-ipmi_100.yml
+         refresh_interval: 5m
+     relabel_configs:
+       - source_labels: [ __address__ ]
+         separator: ;
+         regex: (.*)
+         target_label: __param_target
+         replacement: ${1}
+         action: replace
+       - source_labels: [ __param_target ]
+         separator: ;
+         regex: (.*)
+         target_label: instance
+         replacement: ${1}
+         action: replace
+       - separator: ;
+         regex: .*
+         target_label: __address__
+         replacement: {IP}:9291
+         action: replace
+
+
+  ###############################################################
+  #                      Test-node                             #
+  ###############################################################
+
+   - job_name: 'TEST-exporter'
+     static_configs:
+     file_sd_configs:
+       - files:
+         - ./targets/test-node-exporter.yml
+
+  ###############################################################
+  #                      Alerta-web                             #
+  ###############################################################
+
+   - job_name: alerta
+     metrics_path: /api/management/metrics
+     static_configs:
+       - targets: ['{IP}:9080']
+     basic_auth:
+         username: admin@alerta.io
+         password: ecopass
+
+  ###############################################################
+  #                      SMS Alert                              #
+  ###############################################################
+
+   - job_name: 'blackbox'
+     metrics_path: /probe
+     params:
+       module: [ http_2xx ]  # Look for a HTTP 200 response.
+     tls_config:
+       insecure_skip_verify: true
+     static_configs:
+       - targets:
+         - https://ya.ru
+     relabel_configs:
+       - source_labels: [ __address__ ]
+         target_label: __param_target
+       - source_labels: [ __param_target ]
+         target_label: instance
+       - target_label: __address__
+         replacement: "{IP}:9115"  # Blackbox exporter.
+       - target_label: region
+         replacement: "local"
+
+rule_files:
+  - ./rules/hosts_rules.yml
+  - ./rules/containers_rules.yml
+
+alerting:
+     alertmanagers:
+       - static_configs:
+         - targets: [ '{IP}:9093']

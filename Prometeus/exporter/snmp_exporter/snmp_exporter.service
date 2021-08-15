@@ -1,0 +1,11 @@
+[Unit]
+Description=SNMP Exporter
+After=network-online.target
+
+[Service]
+User=al
+Restart=on-failure
+ExecStart=/opt/prometheus/exporter/snmp_exporter/ipmi/./ipmi_exporter --config.file=/opt/prometheus/exporter/ipmi_exporter/conf/ipmi_remote.yml
+
+[Install]
+WantedBy=multi-user.target

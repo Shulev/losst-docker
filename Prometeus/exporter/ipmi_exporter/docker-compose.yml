@@ -1,0 +1,37 @@
+version: '3.7'
+services:
+  ipmi_exporter:
+    build:
+      context: .
+    volumes:
+      - ./conf/ipmi_remote.yml:/config.yml:ro    # replace with your own config
+    ports:
+      - 9290:9290                           # bind on 0.0.0.0
+      # - 127.0.0.1:9290:9290               # or bind to specific interface
+#    hostname: ipmi_exporter_docker
+
+
+#version: '3'
+#networks:
+#  monitor-net:
+#    driver: bridge
+#
+#services:
+#  ipmi-exporter:
+#    image: ubuntu:latest
+#    container_name: ipmi-exporter
+#    ports:
+#      - "9290:9290"
+#    volumes:
+#      - ./conf/config.ini.example:/etc/ipmi_exporter/config.ini
+#      - ./conf/ipmi_remote.yml:/etc/ipmi_exporter/ipmi_remote.yml
+#      - ./conf/ipmi_exporter:/bin/ipmi_exporter
+#    environment:
+#      - LOG_LEVEL=10
+##    entrypoint: ["/bin/ipmi_exporter"]
+##   command: /etc/ipmi_exporter/ipmi-exporter -c /etc/ipmi-exporter/config.ini
+##    command: ipmi-exporter --config.file=/etc/ipmi_exporter/ipmi_remote.yml
+#    networks:
+#      - monitor-net
+#    labels:
+#      org.label-schema.group: "monitoring-ipmi"

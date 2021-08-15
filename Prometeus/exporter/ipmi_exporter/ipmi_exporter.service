@@ -1,0 +1,12 @@
+[Unit]
+Description=IPMI-66
+After=network-online.target
+
+[Service]
+Restart=on-failure
+User=idle
+EnvironmentFile=/opt/prometheus/.env
+ExecStart=/opt/prometheus/exporter/ipmi_exporter/ipmi/./ipmi_exporter --config.file=/opt/prometheus/exporter/ipmi_exporter/conf/ipmi_remote.yml
+
+[Install]
+WantedBy=multi-user.target
