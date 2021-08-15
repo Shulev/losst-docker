@@ -1,0 +1,3 @@
+../../Docker/-docker-compose-postgresql-pgadmin/postgres-data/*
+../../Docker/-docker-compose-postgresql-pgadmin/pgadmin-data/*
+
